@@ -58,7 +58,7 @@ class RL():
             episode_internals.append(internals)
 
             # here is where the agent acts, this says which action should i take?
-            # which action is optimal for me to take.
+            # this is merely a suggested action ... 
             actions, internals = self.agent.act(
                 states=states, internals=internals, independent=True
             )
@@ -76,7 +76,7 @@ class RL():
             # todo: CALL ORACLE HERE.  but still need to update internals somehow. b/c
             #  we will have one more state than internal.
             #  so probabably have to call states, internals again...
-            
+
             episode_terminal.append(terminal)
             episode_reward.append(reward)
 
