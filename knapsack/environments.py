@@ -8,7 +8,6 @@ class KnapSackEnv(Environment):
         KnapSack environment defined for usage with tensorforce
         '''
         super().__init__()
-
     def states(self):
         return dict(type='float', shape=(8,))
 

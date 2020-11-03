@@ -58,7 +58,7 @@ class RL():
             episode_internals.append(internals)
 
             # here is where the agent acts, this says which action should i take?
-            # this is merely a suggested action ... 
+            # this is merely a suggested action ...
             actions, internals = self.agent.act(
                 states=states, internals=internals, independent=True
             )
