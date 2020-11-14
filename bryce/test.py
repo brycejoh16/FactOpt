@@ -4,9 +4,10 @@
 import numpy as np
 import torch
 import gym
+import or_gym
 from torch import nn
 import matplotlib.pyplot as plt
-
+from ray.rllib import agents
 
 def t(x): return torch.from_numpy(x).float()
 
@@ -16,9 +17,9 @@ class Actor(nn.Module):
         super().__init__()
         self.model = nn.Sequential(
             nn.Linear(state_dim, 64),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(64, 32),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(32, n_actions),
             nn.Softmax()
         )
@@ -42,13 +43,22 @@ class Critic(nn.Module):
     def forward(self, X):
         return self.model(X)
 def main():
-    env = gym.make("CartPole-v1")
+    env_config = {'N': 5,
+                  'max_weight': 15,
+                  'item_weights': np.array([1, 12, 2, 1, 4]),
+                  'item_values': np.array([2, 4, 2, 1, 10]),
+                  'mask': True}
+    env = or_gym.make("Knapsack-v0",env_config=env_config)
 
-    state_dim = env.observation_space.shape[0]
+
+    # this code is edited from the original cartpole problem
+
+    # the shape of this state_dim is N +N +1 where N is the number of items and the
+    # final value is the total weight.
+    state_dim = env.observation_space.spaces['state'].shape[0]
     n_actions = env.action_space.n
     actor = Actor(state_dim, n_actions)
     critic = Critic(state_dim)
-
 
     # training hyperparameters right here.
     # here we are constructing an optimizer object
@@ -69,15 +79,23 @@ def main():
         state = env.reset()
         # monte carlo random walk
         # done :boolean a terminal condition.
+        # S=[state['state']]
         while not done:
             # find the probabilities
-            probs = actor(t(state))
+            # input=np.hstack([state['avail_actions'],state['state']])
+            probs = actor(t(state['state']))
+
 
             # make a categorical ditribution from probailities
             dist = torch.distributions.Categorical(probs=probs)
 
             # randomly sample from that. distribution is built on prior information.
             action = dist.sample()
+            # call the oracle right here , ... #todo: emma/diya determining when/how often to call oracle between
+            #                                    monte carlo steps and episodes. 
+
+
+
 
             # environment takes its next step. , actor critic stuff.
             next_state, reward, done, info = env.step(action.detach().data.numpy())
@@ -86,11 +104,14 @@ def main():
             # gamma being closer to zero means more greedy.
 
             # so accounting for future state more. #todo: come back to this
-            advantage = reward + (1 - done) * gamma * critic(t(next_state)) - critic(t(state))
+            advantage = reward + (1 - done) * gamma * critic(t(next_state['state'])) - critic(t(state['state']))
 
 
             total_reward += reward
             state = next_state
+
+
+            # S.append(state['state'])
 
 
             # critic loss ... mean(a^2)
@@ -108,6 +129,8 @@ def main():
             adam_critic.step()
 
             actor_loss = -dist.log_prob(action) * advantage.detach()
+
+            #updating parameters
             adam_actor.zero_grad()
             actor_loss.backward()
             adam_actor.step()

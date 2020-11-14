@@ -27,6 +27,7 @@ class RL():
         for _ in range(nb_episodes):
             self.episode()
         #todo: we should have some parameter here stating how well the train went.
+
     def episode(self):
         '''
         a single episode ... todo :describe what this does here...basically what is an episode
