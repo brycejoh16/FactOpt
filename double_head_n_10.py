@@ -8,7 +8,7 @@ import gym
 import or_gym
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-
+import random
 
 # adapted from https://www.datahubbs.com/two-headed-a2c-network-in-pytorch/ - Christian Hubbs
 def t(x): return torch.from_numpy(x).float()
@@ -32,9 +32,12 @@ class actorCriticNet(nn.Module):
 
         # Generate network according to hidden layer and node settings
         self.layers = OrderedDict()
-        self.n_layers = 2 * self.n_hidden_layers
+        self.n_layers = 2 * self.n_hidden_layers + 1
+
         for i in range(self.n_layers + 1):
             # Define single linear layer
+
+
             if self.n_hidden_layers == 0:
                 self.layers[str(i)] = nn.Linear(
                     self.n_inputs,
@@ -52,8 +55,12 @@ class actorCriticNet(nn.Module):
                     self.n_hidden_nodes,
                     self.n_hidden_nodes,
                     bias=self.bias)
+                self.layers[str(i+1)] = nn.Dropout(.9)
+
+
             else:
                 self.layers[str(i)] = nn.ReLU()
+
 
         self.body = nn.Sequential(self.layers)
 
@@ -123,6 +130,8 @@ class A2C():
                 self.reward += r
                 states.append(self.s_0)
                 next_states.append(s_1)
+                r = r*random.uniform(0.8, 1.2)
+                print(action)
                 actions.append(action)
                 rewards.append(r)
                 dones.append(done)
@@ -179,7 +188,7 @@ class A2C():
         return G, td_delta
 
     def train(self, n_steps=5, batch_size=10, num_episodes=2000,
-              gamma=0.99, beta=1 - 3, zeta=0.5):
+              gamma=0.99, beta=0.5, zeta=1):
         self.n_steps = n_steps
         self.gamma = gamma
         self.num_episodes = num_episodes
@@ -204,12 +213,13 @@ class A2C():
             G, td_delta = self.calc_rewards(batch)
             states = batch[0]
             actions = batch[1]
+
             current_probs = self.network.predict(states)[0].detach().cpu().numpy()
 
             self.update(states, actions, G, td_delta)
 
             new_probs = self.network.predict(states)[0].detach().cpu().numpy()
-            kl = -np.sum(current_probs * np.log(new_probs / (current_probs + 0.000000001)))
+            kl = -np.sum(current_probs * np.log(new_probs / (current_probs + 0.0000001)))
             self.kl_div.append(kl)
 
             print("\rMean Rewards: {:.2f} Episode: {:d}    ".format(
@@ -223,7 +233,7 @@ class A2C():
         plt.figure(figsize=(15, 10))
         gs = gridspec.GridSpec(3, 2)
         ax0 = plt.subplot(gs[0, :])
-        ax0.plot(self.ep_rewards)
+        #ax0.plot(self.ep_rewards)
         ax0.plot(avg_rewards)
         ax0.set_xlabel('Episode')
         plt.title('Rewards')
@@ -292,8 +302,9 @@ class A2C():
 env = or_gym.make('Knapsack-v0')
 env.N = 10
 env.randomize_params_on_reset = True
-net = actorCriticNet(env, learning_rate=1e-6, n_hidden_layers=4, n_hidden_nodes=64)
+net = actorCriticNet(env, learning_rate=5e-5, n_hidden_layers=4, n_hidden_nodes=56)
 
 a2c = A2C(env, net)
-a2c.train(n_steps=50, num_episodes=150000, beta=1e-3, zeta=1e-6)
+a2c.train(batch_size=100, num_episodes=50000, beta=4, zeta=0.01)
 a2c.plot_results()
+
