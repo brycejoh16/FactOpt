@@ -1,4 +1,4 @@
-import torch 
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import copy
@@ -8,29 +8,35 @@ import gym
 import or_gym
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
-#adapted from https://www.datahubbs.com/two-headed-a2c-network-in-pytorch/ - Christian Hubbs
+import random
+
+# adapted from https://www.datahubbs.com/two-headed-a2c-network-in-pytorch/ - Christian Hubbs
 def t(x): return torch.from_numpy(x).float()
-#for cpu users, change device = 'cuda' to device = 'cpu', also uncomment line 75/76. potential other tensor issues, just go through and delete stuff til it works
+
+# for cpu users, change device = 'cuda' to device = 'cpu'
 class actorCriticNet(nn.Module):
     def __init__(self, env, n_hidden_layers=4, n_hidden_nodes=32,
                  learning_rate=0.01, bias=False, device='cuda'):
         super(actorCriticNet, self).__init__()
         self.device = device
-        #self.n_inputs = env.observation_space.shape[0]
-        self.n_inputs = 200 * 2 + 1
-        #self.n_outputs = env.action_space.n
-        self.n_outputs = 200
+        # self.n_inputs = env.observation_space.shape[0]
+        self.n_inputs = 21
+        # self.n_outputs = env.action_space.n
+        self.n_outputs = 10
         self.n_hidden_nodes = n_hidden_nodes
         self.n_hidden_layers = n_hidden_layers
         self.learning_rate = learning_rate
         self.bias = bias
         self.action_space = np.arange(self.n_outputs)
-        
+
         # Generate network according to hidden layer and node settings
         self.layers = OrderedDict()
-        self.n_layers = 2 * self.n_hidden_layers
+        self.n_layers = 2 * self.n_hidden_layers + 1
+
         for i in range(self.n_layers + 1):
             # Define single linear layer
+
+
             if self.n_hidden_layers == 0:
                 self.layers[str(i)] = nn.Linear(
                     self.n_inputs,
@@ -38,8 +44,8 @@ class actorCriticNet(nn.Module):
                     bias=self.bias)
             # Define input layer for multi-layer network
             elif i % 2 == 0 and i == 0 and self.n_hidden_layers != 0:
-                self.layers[str(i)] = nn.Linear( 
-                    self.n_inputs, 
+                self.layers[str(i)] = nn.Linear(
+                    self.n_inputs,
                     self.n_hidden_nodes,
                     bias=self.bias)
             # Define intermediate hidden layers
@@ -48,11 +54,15 @@ class actorCriticNet(nn.Module):
                     self.n_hidden_nodes,
                     self.n_hidden_nodes,
                     bias=self.bias)
+                self.layers[str(i+1)] = nn.Dropout(.9)
+
+
             else:
                 self.layers[str(i)] = nn.ReLU()
-                
+
+
         self.body = nn.Sequential(self.layers)
-            
+
         # Define policy head
         self.policy = nn.Sequential(
             nn.Linear(self.n_hidden_nodes,
@@ -69,15 +79,11 @@ class actorCriticNet(nn.Module):
                       bias=self.bias),
             nn.ReLU(),
             nn.Linear(self.n_hidden_nodes,
-                      1, 
+                      1,
                       bias=self.bias))
-
-       # if self.device == 'cuda':
-        #    self.net.cuda()
 
         self.optimizer = torch.optim.Adam(self.parameters(),
                                           lr=self.learning_rate)
-            
     def predict(self, state):
         body_output = self.get_body_output(state)
         probs = F.softmax(self.policy(body_output), dim=-1)
@@ -87,25 +93,24 @@ class actorCriticNet(nn.Module):
 
         state_t = torch.FloatTensor(state).to(device=self.device)
         return self.body(state_t)
-    
+
     def get_action(self, state):
-        probs = (self.predict(state))[0].detach().cpu().numpy()
+        probs = (self.predict(state))[0].cpu().detach().numpy()
         action = np.random.choice(self.action_space, p=probs)
         return action
-    
+
     def get_log_probs(self, state):
         body_output = self.get_body_output(state)
         logprobs = F.log_softmax(self.policy(body_output), dim=-1)
-        return logprobs    
-
+        return logprobs
 
 class A2C():
     def __init__(self, env, network):
-        
         self.env = env
         self.network = network
         self.action_space = np.arange(env.action_space.n)
-        
+        self.reset_k = 0
+
     def generate_episode(self):
         states, actions, rewards, dones, next_states = [], [], [], [], []
         counter = 0
@@ -119,70 +124,77 @@ class A2C():
                 self.reward += r
                 states.append(self.s_0)
                 next_states.append(s_1)
+                r = r*random.uniform(0.8, 1.2)
                 actions.append(action)
                 rewards.append(r)
                 dones.append(done)
                 self.s_0 = s_1
-                
                 if done:
                     self.ep_rewards.append(self.reward)
-                    self.s_0 = self.env.reset()['state']
+                    if self.reset_k == 10:
+                        env.randomize_params_on_reset = True
+                        self.s_0 = self.env.reset()['state']
+                        self.reset_k = 0
+                    else:
+                        self.reset_k += 1
+                        env.randomize_params_on_reset = False
+                        self.s_0 = self.env.reset()['state']
                     self.reward = 0
                     self.ep_counter += 1
                     if self.ep_counter >= self.num_episodes:
                         counter = total_count
                         break
-                
+
                 counter += 1
                 if counter >= total_count:
                     break
         return states, actions, rewards, dones, next_states
-    
+
     def calc_rewards(self, batch):
         states, actions, rewards, dones, next_states = batch
         rewards = np.array(rewards)
         total_steps = len(rewards)
-        
+
         state_values = self.network.predict(states)[1]
         next_state_values = self.network.predict(next_states)[1]
         done_mask = torch.ByteTensor(dones).to(self.network.device)
         next_state_values[done_mask] = 0.0
         state_values = state_values.detach().cpu().numpy().flatten()
         next_state_values = next_state_values.detach().cpu().numpy().flatten()
-        
+
         G = np.zeros_like(rewards, dtype=np.float32)
         td_delta = np.zeros_like(rewards, dtype=np.float32)
         dones = np.array(dones)
-        
+
         for t in range(total_steps):
             last_step = min(self.n_steps, total_steps - t)
-            
+
             # Look for end of episode
-            check_episode_completion = dones[t:t+last_step]
+            check_episode_completion = dones[t:t + last_step]
             if check_episode_completion.size > 0:
                 if True in check_episode_completion:
                     next_ep_completion = np.where(check_episode_completion == True)[0][0]
                     last_step = next_ep_completion
-            
+
             # Sum and discount rewards
-            G[t] = sum([rewards[t+n:t+n+1] * self.gamma ** n for 
+            G[t] = sum([rewards[t + n:t + n + 1] * self.gamma ** n for
                         n in range(last_step)])
-        
+
         if total_steps > self.n_steps:
             G[:total_steps - self.n_steps] += next_state_values[self.n_steps:] \
-                * self.gamma ** self.n_steps
+                                              * self.gamma ** self.n_steps
         td_delta = G - state_values
         return G, td_delta
-        
-    def train(self, n_steps=5, batch_size=10, num_episodes=2000, 
-              gamma=0.99, beta=1-3, zeta=0.5):
+
+    def train(self, n_steps=5, batch_size=10, num_episodes=2000,
+              gamma=0.99, beta=0.5, zeta=1):
         self.n_steps = n_steps
         self.gamma = gamma
         self.num_episodes = num_episodes
         self.beta = beta
         self.zeta = zeta
         self.batch_size = batch_size
-        
+
         # Set up lists to log data
         self.ep_rewards = []
         self.kl_div = []
@@ -191,35 +203,35 @@ class A2C():
         self.entropy_loss = []
         self.total_policy_loss = []
         self.total_loss = []
-        
+
         self.s_0 = self.env.reset()['state']
         self.reward = 0
         self.ep_counter = 0
         while self.ep_counter < num_episodes:
-            
             batch = self.generate_episode()
             G, td_delta = self.calc_rewards(batch)
             states = batch[0]
             actions = batch[1]
+
             current_probs = self.network.predict(states)[0].detach().cpu().numpy()
-            
+
             self.update(states, actions, G, td_delta)
-            
+
             new_probs = self.network.predict(states)[0].detach().cpu().numpy()
-            kl = -np.sum(current_probs * np.log(new_probs / (current_probs+0.000000001)))
+            kl = -np.sum(current_probs * np.log(new_probs / (current_probs + 0.0000001)))
             self.kl_div.append(kl)
-            
+
             print("\rMean Rewards: {:.2f} Episode: {:d}    ".format(
                 np.mean(self.ep_rewards[-100:]), self.ep_counter), end="")
-            
-    def plot_results(self):
-        avg_rewards = [np.mean(self.ep_rewards[i:i + self.batch_size]) 
-                       if i > self.batch_size 
-            else np.mean(self.ep_rewards[:i + 1]) for i in range(len(self.ep_rewards))]
 
-        plt.figure(figsize=(15,10))
+    def plot_results(self):
+        avg_rewards = [np.mean(self.ep_rewards[i:i + self.batch_size])
+                       if i > self.batch_size
+                       else np.mean(self.ep_rewards[:i + 1]) for i in range(len(self.ep_rewards))]
+
+        plt.figure(figsize=(15, 10))
         gs = gridspec.GridSpec(3, 2)
-        ax0 = plt.subplot(gs[0,:])
+        ax0 = plt.subplot(gs[0, :])
         ax0.plot(self.ep_rewards)
         ax0.plot(avg_rewards)
         ax0.set_xlabel('Episode')
@@ -247,47 +259,46 @@ class A2C():
 
         plt.tight_layout()
         plt.show()
-        
+
     def calc_loss(self, states, actions, rewards, advantages, beta=0.001):
         actions_t = torch.LongTensor(actions).to(self.network.device)
         rewards_t = torch.FloatTensor(rewards).to(self.network.device)
         advantages_t = torch.FloatTensor(advantages).to(self.network.device)
-        
+
         log_probs = self.network.get_log_probs(states)
         log_prob_actions = advantages_t * log_probs[range(len(actions)), actions]
         policy_loss = -log_prob_actions.mean()
-        
+
         action_probs, values = self.network.predict(states)
         entropy_loss = -self.beta * (action_probs * log_probs).sum(dim=1).mean()
-        
+
         value_loss = self.zeta * nn.MSELoss()(values.squeeze(-1), rewards_t)
-        
+
         # Append values
         self.policy_loss.append(policy_loss)
         self.value_loss.append(value_loss)
         self.entropy_loss.append(entropy_loss)
-        
         return policy_loss, entropy_loss, value_loss
-        
+
     def update(self, states, actions, rewards, advantages):
         self.network.optimizer.zero_grad()
-        policy_loss, entropy_loss, value_loss = self.calc_loss(states, 
-            actions, rewards, advantages)
-        
+        policy_loss, entropy_loss, value_loss = self.calc_loss(states,
+                                                               actions, rewards, advantages)
         total_policy_loss = policy_loss - entropy_loss
         self.total_policy_loss.append(total_policy_loss)
         total_policy_loss.backward(retain_graph=True)
-        
+
         value_loss.backward()
-        
+
         total_loss = policy_loss + value_loss + entropy_loss
         self.total_loss.append(total_loss)
         self.network.optimizer.step()
 
-
 env = or_gym.make('Knapsack-v0')
-net = actorCriticNet(env, learning_rate=1e-3, n_hidden_layers=4, n_hidden_nodes=64)
-net = net.to('cuda')
+env.N = 10
+env.randomize_params_on_reset = True
+net = actorCriticNet(env, learning_rate=1e-4, n_hidden_layers=2, n_hidden_nodes=800)
+net.cuda()
 a2c = A2C(env, net)
-a2c.train(n_steps=50, num_episodes=2000, beta=1e-3, zeta=1e-3)
+a2c.train(batch_size=10, n_steps=100, num_episodes=10000, beta=1e-3, zeta=0.01)
 a2c.plot_results()
