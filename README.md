@@ -6,7 +6,7 @@ This is for a chen 5595 project. It is the optimization using machine learning o
 
 Type in from terminal (mac) or anaconda command line: 
 
-`conda create --name <env>  python=3.7.9 matplotlib pytorch=1.6.0 numpy=1.18.5`
+`conda create --name <env>  python=3.7.* matplotlib numpy=1.18.5`
 
 `conda activate <env>`
 
