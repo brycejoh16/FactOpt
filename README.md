@@ -3,14 +3,16 @@ This is for a chen 5595 project. It is the optimization using machine learning o
 
 
 ## Setup  
-For this so far all you need is `tensorforce`,`numpy`, and `or_gym` 
-so for now type in from terminal (mac) or anaconda command line: 
 
-`conda create --name factopt  python=3.7.* numpy`
+Type in from terminal (mac) or anaconda command line: 
 
-`conda activate factopt`
+`conda create --name <env>  python=3.7.* matplotlib numpy=1.18.5`
 
-`pip install tensorforce or_gym`
+`conda activate <env>`
+
+`pip install or_gym`
+
+`conda install -c pytorch pytorch` 
 
 Enviroment setup complete.
 ## knapsack
