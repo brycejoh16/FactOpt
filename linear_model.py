@@ -23,7 +23,7 @@ class actor(nn.Module):
         # simple sequential nueral network
         self.model=nn.Sequential(
             nn.Linear(2*N+1,N),
-            # nn.ReLU()
+            nn.ReLU()
             # nn.Softmax()
         )
 
@@ -158,7 +158,7 @@ if __name__=='__main__':
     K=7
     nb_episodes = 10000
     criterion = nn.CrossEntropyLoss()
-    directory = 'linear_only_actor,CrossEntropy,oracletrainer,batch_updates'
+    directory = 'relu_only_actor,CrossEntropy,oracletrainer,batch_updates'
 
     LR=np.array([ 10**i for i in np.arange(-2,3,1,dtype='float')])
 
