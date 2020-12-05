@@ -12,6 +12,8 @@ so for now type in from terminal (mac) or anaconda command line:
 
 `pip install or_gym`
 
+`conda install -c pytorch pytorch` 
+
 Enviroment setup complete.
 ## knapsack
 
