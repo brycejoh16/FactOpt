@@ -3,8 +3,8 @@ This is for a chen 5595 project. It is the optimization using machine learning o
 
 
 ## Setup  
-For this so far all you need is `tensorforce`,`numpy`, and `or_gym` 
-so for now type in from terminal (mac) or anaconda command line: 
+
+Type in from terminal (mac) or anaconda command line: 
 
 `conda create --name <env>  python=3.7.9 matplotlib pytorch=1.6.0 numpy=1.18.5`
 
