@@ -30,8 +30,8 @@ def oracle(state: np.ndarray, N: int) -> np.ndarray:
     items = state[0:N]
     currency = state[N:-1]
     optimal_item = np.argmax(currency / items)
-    optimal_state = np.zeros(N)
-    optimal_state[optimal_item] = 1
-    return optimal_state
+    # optimal_state = np.zeros(N)
+    # optimal_state[optimal_item] = 1
+    return optimal_item
 
 

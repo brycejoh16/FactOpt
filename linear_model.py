@@ -8,8 +8,12 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import os ,sys
 import search_modules as sm
-def numpy2torch(a:np.ndarray):
-    return torch.from_numpy(a).float()
+def numpy2torch(a:np.ndarray,long=False):
+    if long:
+        return torch.from_numpy(a).long()
+    else:
+        return torch.from_numpy(a).float()
+
 def torch2numpy(a:torch.Tensor):
     return a.detach().numpy()
 
@@ -19,7 +23,8 @@ class actor(nn.Module):
         # simple sequential nueral network
         self.model=nn.Sequential(
             nn.Linear(2*N+1,N),
-            nn.Softmax()
+            # nn.ReLU()
+            # nn.Softmax()
         )
 
     def forward(self,x):
@@ -39,6 +44,7 @@ def train(env:or_gym.envs.classic_or,net:actor,
     :param optimizer: torch.optim
     :return: training 2d ndarray with
     '''
+    N=env.N
     episode_reward = []
     episode_nb_steps=[]
     for j in range(nb_episodes):
@@ -48,6 +54,8 @@ def train(env:or_gym.envs.classic_or,net:actor,
         eps_reward=0
         i=0
         print('episode %i'%j)
+        Target=[]
+        OUT=[]
         while not done:
             # print(i)
             # the first state
@@ -65,12 +73,8 @@ def train(env:or_gym.envs.classic_or,net:actor,
             optimal_state=sm.oracle(state['state'],N)
             #this is easy optimization, we compare the ideal target to the expected
             # target in and L2 norm optimization
-            target= numpy2torch(optimal_state)
-            # print(target)
-            loss = criterion(out,target)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            Target.append(optimal_state)
+            OUT.append(out)
             i+=1
 
             # print('current state:')
@@ -79,6 +83,13 @@ def train(env:or_gym.envs.classic_or,net:actor,
             # print(eps_reward)
             # print('# of steps: %i'%i)
 
+
+        out_batch=torch.reshape(torch.cat(OUT,0),(i,N))
+        target_batch=torch.tensor(Target,dtype=torch.long)
+        loss = criterion(out_batch,target_batch)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
         episode_nb_steps.append(i)
         episode_reward.append(eps_reward)
 
@@ -117,14 +128,14 @@ def plot_train_reward(training_reward:np.ndarray,mean_reward:np.ndarray ,eps_nb_
     plt.plot(eps,eps_nb_steps)
     plt.xlabel('episode')
     plt.ylabel('steps per episode')
-    plt.savefig('./results/%s_steps.png'%prefix)
+    plt.savefig(dir+'/%s_steps.png'%prefix)
     plt.close()
 
 
 
 if __name__=='__main__':
 
-    N=200
+    N=10
     # print(net)
     # param=list(net.parameters())
     # print(param[0].size())
@@ -145,11 +156,11 @@ if __name__=='__main__':
     #print(net)
 
     K=7
-    nb_episodes = 3000
-    criterion = nn.MSELoss()
-    directory = 'linear_only_actor,MSEloss,oracletrainer'
+    nb_episodes = 10000
+    criterion = nn.CrossEntropyLoss()
+    directory = 'linear_only_actor,CrossEntropy,oracletrainer,batch_updates'
 
-    LR=np.array([ 10**i for i in np.arange(-5,2,1,dtype='float')])
+    LR=np.array([ 10**i for i in np.arange(-2,3,1,dtype='float')])
 
 
     failure=os.system('mkdir ./results/'+directory)
