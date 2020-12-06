@@ -8,6 +8,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import os ,sys
 import search_modules as sm
+import plot_modules as pm
 def numpy2torch(a:np.ndarray,long=False):
     if long:
         return torch.from_numpy(a).long()
@@ -23,7 +24,7 @@ class actor(nn.Module):
         # simple sequential nueral network
         self.model=nn.Sequential(
             nn.Linear(2*N+1,N),
-            nn.ReLU()
+            # nn.ReLU()
             # nn.Softmax()
         )
 
@@ -83,7 +84,6 @@ def train(env:or_gym.envs.classic_or,net:actor,
             # print(eps_reward)
             # print('# of steps: %i'%i)
 
-
         out_batch=torch.reshape(torch.cat(OUT,0),(i,N))
         target_batch=torch.tensor(Target,dtype=torch.long)
         loss = criterion(out_batch,target_batch)
@@ -99,38 +99,6 @@ def train(env:or_gym.envs.classic_or,net:actor,
 # def test(env:or_gym.envs.classic_or,net:actor,
 #           nb_episodes:int,optimizer:torch.optim,
 #           discout:float,
-#           loss):
-def plot_train_reward(training_reward:np.ndarray,mean_reward:np.ndarray ,eps_nb_steps:np.ndarray,prefix:str,
-                      title:str,K:int,direcotry:str):
-    '''
-
-    :param training_reward:
-    :param eps_nb_steps:
-    :param prefix:
-    :param title:
-    :return:
-    '''
-    # mean_reward= np.mean(training_reward,axis=1)
-    # max_reward=np.max(training_reward,axis=1)
-    # min_reward=np.min(training_reward,axis=1)
-    dir='./results/'+direcotry
-    # plot the results
-    eps=np.arange(training_reward.shape[0])
-    plt.title(title)
-    plt.scatter(eps,training_reward,label='total-reward per episode',s=0.3)
-    plt.plot(eps[0:mean_reward.shape[0]],mean_reward,label='mean reward over K:%i average'%K)
-    plt.xlabel('episodes')
-    plt.legend()
-    plt.ylabel('reward')
-    plt.savefig(dir+'/%s_rewards.png'%prefix)
-    plt.close()
-
-    plt.plot(eps,eps_nb_steps)
-    plt.xlabel('episode')
-    plt.ylabel('steps per episode')
-    plt.savefig(dir+'/%s_steps.png'%prefix)
-    plt.close()
-
 
 
 if __name__=='__main__':
@@ -153,7 +121,7 @@ if __name__=='__main__':
     env.set_seed(int.from_bytes(os.urandom(4), sys.byteorder))
 
     net = actor(N)
-    #print(net)
+    print(net)
 
     K=7
     nb_episodes = 10000
@@ -162,7 +130,6 @@ if __name__=='__main__':
 
     LR=np.array([ 10**i for i in np.arange(-2,3,1,dtype='float')])
 
-
     failure=os.system('mkdir ./results/'+directory)
 
 
@@ -170,8 +137,10 @@ if __name__=='__main__':
         optimizer = optim.Adam(net.parameters(), lr=lr)
         training_reward,eps_steps=train(env,net,nb_episodes=nb_episodes,optimizer=optimizer,criterion=criterion)
         mean_reward=sm.average_reward(training_reward,K=K)
-        plot_train_reward(training_reward,mean_reward,eps_steps,title='With oracle trainer',prefix='oracle_trainer_episodes_%i_items_%i_lr_%0.8f_relu'%(nb_episodes,N,lr),
+        pm.plot_train_reward(training_reward,mean_reward,eps_steps,title='With oracle trainer',prefix='oracle_trainer_episodes_%i_items_%i_lr_%0.8f_relu'%(nb_episodes,N,lr),
                           K=K,direcotry=directory)
+
+
 
 
 
