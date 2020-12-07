@@ -22,7 +22,7 @@ class actor(nn.Module):
         # simple sequential nueral network
         self.model=nn.Sequential(
             nn.Linear(2*N+1,N),
-            # nn.ReLU(),
+            nn.ReLU(),
             nn.Softmax(dim=0)
         )
 
@@ -158,7 +158,7 @@ if __name__=='__main__':
     LR=np.array([ 10**i for i in np.arange(-2,3,1,dtype='float')])
     CLR = np.array([10 ** i for i in np.arange(-2, 3, 1, dtype='float')])
 
-    directory = 'linear_actor,linear_critic,one_step,actor_critic_episodes_%i_items_%i' % (nb_episodes, N)
+    directory = 'relu_actor,linear_critic,one_step,actor_critic_episodes_%i_items_%i' % (nb_episodes, N)
     failure = os.system('mkdir ./results/' + directory)
     discout=0.99
     MR=[]
