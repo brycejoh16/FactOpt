@@ -124,9 +124,9 @@ if __name__=='__main__':
     print(net)
 
     K=7
-    nb_episodes = 10000
+    nb_episodes = 1000
     criterion = nn.CrossEntropyLoss()
-    directory = 'relu_only_actor,CrossEntropy,oracletrainer,batch_updates'
+    directory = 'linear_only_actor,CrossEntropy,oracletrainer,batch_updates'
 
     LR=np.array([ 10**i for i in np.arange(-2,3,1,dtype='float')])
 
