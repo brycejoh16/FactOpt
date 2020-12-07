@@ -156,7 +156,7 @@ if __name__=='__main__':
     print(net2)
 
     K=7
-    nb_episodes = 10
+    nb_episodes = 10000
 
     LR=np.array([ 10**i for i in np.arange(-2,3,1,dtype='float')])
     CLR = np.array([10 ** i for i in np.arange(-2, 3, 1, dtype='float')])
@@ -182,7 +182,7 @@ if __name__=='__main__':
             pm.plot_loss(AL,CL,directory,prefix,K=K)
 
         MR.append(np.array(mr))
-        
+
     pm.plot_mean_rewards(MR,LR,CLR,directory=directory)
 
 
