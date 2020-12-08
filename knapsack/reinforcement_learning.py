@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 
 
 from tensorforce.execution import Runner
@@ -86,49 +87,89 @@ class RL():
             states=episode_states, internals=episode_internals,
             actions=episode_actions, terminal=episode_terminal,
             reward=episode_reward
+=======
+import numpy as np
+import torch
+import gym
+from torch import nn
+import matplotlib.pyplot as plt
+
+def t(x): return torch.from_numpy(x).float()
+
+
+class Actor(nn.Module):
+    def __init__(self, state_dim, n_actions):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.Tanh(),
+            nn.Linear(64, 32),
+            nn.Tanh(),
+            nn.Linear(32, n_actions),
+            nn.Softmax(dim=0)
+>>>>>>> Stashed changes
         )
 
-        # update the agent.
-        self.agent.update()
-
-    def test(self):
-        sum_rewards = 0.0
-        for _ in range(100):
-            # print(sum_rewards)
-            states = self.env.reset()
-            internals = self.agent.initial_internals()
-            terminal = False
-            while not terminal:
-                actions, internals = self.agent.act(
-                    states=states, internals=internals,
-                    independent=True
-                )
-                states, terminal, reward = self.env.execute(actions=actions)
-                sum_rewards += reward
-        print('Mean episode reward:', sum_rewards / 100)
-        self.close()
-
-    def close(self):
-        self.agent.close()
-        self.env.close()
+    def forward(self, X):
+        return self.model(X)
 
 
+class Critic(nn.Module):
+    def __init__(self, state_dim):
+        super().__init__()
+        self.model = nn.Sequential(
+            nn.Linear(state_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Linear(32, 1)
+        )
 
+    def forward(self, X):
+        return self.model(X)
 
+env = gym.make("CartPole-v1")
 
+state_dim = env.observation_space.shape[0]
+n_actions = env.action_space.n
+actor = Actor(state_dim, n_actions)
+critic = Critic(state_dim)
+adam_actor = torch.optim.Adam(actor.parameters(), lr=1e-3)
+adam_critic = torch.optim.Adam(critic.parameters(), lr=1e-3)
+gamma = 0.99
 
+episode_rewards = []
 
+for i in range(500):
+    done = False
+    total_reward = 0
+    state = env.reset()
 
+    while not done:
+        probs = actor(t(state))
+        dist = torch.distributions.Categorical(probs=probs)
+        action = dist.sample()
 
+        next_state, reward, done, info = env.step(action.detach().data.numpy())
+        advantage = reward + (1 - done) * gamma * critic(t(next_state)) - critic(t(state))
 
+        total_reward += reward
+        state = next_state
 
-'''CustomEnvironment = or_gym.make('Knapsack-v0')
-environment = Environment.create(
-    environment=CustomEnvironment, max_episode_timesteps=100
-)
+        critic_loss = advantage.pow(2).mean()
+        adam_critic.zero_grad()
+        critic_loss.backward()
+        adam_critic.step()
 
-agent=Agent.create(
-    agent='a2c',
-    environment=environment,
-    batch_size = 10
-)'''
+        actor_loss = -dist.log_prob(action) * advantage.detach()
+        adam_actor.zero_grad()
+        actor_loss.backward()
+        adam_actor.step()
+
+    episode_rewards.append(total_reward)
+
+plt.scatter(np.arange(len(episode_rewards)), episode_rewards, s=2)
+plt.title("Total reward per episode (online)")
+plt.ylabel("reward")
+plt.xlabel("episode")
+plt.show()

@@ -18,7 +18,7 @@ Enviroment setup complete.
 ## knapsack
 
 Current files: 
-
+- `Knap_Sack_sorta_working` :knapsack v0 environment, utilizes GPU functionality for torch tensors. 
 - `driver` :drive script to initilize stuff for a given run
 - `environments`: where we can make various custom enviroments
 - `reinforcement_learning`: top class which defines how reinforcement
