@@ -17,11 +17,12 @@ def numpy2torch(a:np.ndarray,long=False):
 def torch2numpy(a:torch.Tensor):
     return a.detach().numpy()
 class actor(nn.Module):
-    def __init__(self,N):
+    def __init__(self,N,dr):
         super(actor,self).__init__()
         # simple sequential nueral network
         self.model=nn.Sequential(
             nn.Linear(2*N+1,N),
+            nn.Dropout(dr),
             nn.ReLU(),
             nn.Softmax(dim=0)
         )
@@ -147,9 +148,9 @@ if __name__=='__main__':
     # right now take fresh entropy from the computer
     env.set_seed(int.from_bytes(os.urandom(4), sys.byteorder))
 
-    net = actor(N)
+
     net2=critic(N)
-    print(net)
+
     print(net2)
 
     K=7
@@ -157,30 +158,32 @@ if __name__=='__main__':
 
     LR=np.array([ 10**i for i in np.arange(-2,3,1,dtype='float')])
     CLR = np.array([10 ** i for i in np.arange(-2, 3, 1, dtype='float')])
+    DR=np.arange(1,5,1)*.2
 
-    directory = 'relu_actor,linear_critic,one_step,actor_critic_episodes_%i_items_%i' % (nb_episodes, N)
-    failure = os.system('mkdir ./results/' + directory)
     discout=0.99
     MR=[]
-    for lr in LR:
-        mr=[]
-        for clr in CLR:
+    for dr in DR:
+        directory = 'dropout_%0.2f_relu_actor,linear_critic,one_step,actor_critic_episodes_%i_items_%i' % (dr,nb_episodes, N)
+        failure = os.system('mkdir ./results/' + directory)
+        net = actor(N,dr)
+        for lr in LR:
+            mr=[]
+            for clr in CLR:
+                print('alr :%0.4f , clr:%0.4f'%(lr,clr))
+                prefix = 'alr_%0.4f_clr_%0.4f' % (lr, clr)
+                optimizer = optim.Adam(net.parameters(), lr=lr)
+                optimizer_critic=optim.Adam(net2.parameters(),lr=clr)
+                training_reward,eps_steps,CL,AL=train(env,net,net2,discout=discout,
+                                                nb_episodes=nb_episodes,optimizer=optimizer,optimizer_critic=optimizer_critic)
+                mean_reward=sm.average_reward(training_reward,K=K)
+                mr.append(np.mean(mean_reward))
+                pm.plot_train_reward(training_reward,mean_reward,eps_steps,title='Average Reward: %0.2f'%mr[-1],prefix=prefix,
+                                  K=K,direcotry=directory)
+                pm.plot_loss(AL,CL,directory,prefix,K=K)
 
-            print('alr :%0.4f , clr:%0.4f'%(lr,clr))
-            prefix = 'alr_%0.4f_clr_%0.4f' % (lr, clr)
-            optimizer = optim.Adam(net.parameters(), lr=lr)
-            optimizer_critic=optim.Adam(net2.parameters(),lr=clr)
-            training_reward,eps_steps,CL,AL=train(env,net,net2,discout=discout,
-                                            nb_episodes=nb_episodes,optimizer=optimizer,optimizer_critic=optimizer_critic)
-            mean_reward=sm.average_reward(training_reward,K=K)
-            mr.append(np.mean(mean_reward))
-            pm.plot_train_reward(training_reward,mean_reward,eps_steps,title='Average Reward: %0.2f'%mr[-1],prefix=prefix,
-                              K=K,direcotry=directory)
-            pm.plot_loss(AL,CL,directory,prefix,K=K)
+            MR.append(np.array(mr))
 
-        MR.append(np.array(mr))
-
-    pm.plot_mean_rewards(MR,LR,CLR,directory=directory)
+        pm.plot_mean_rewards(MR,LR,CLR,directory=directory)
 
 
 
